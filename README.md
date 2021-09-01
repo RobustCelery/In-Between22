@@ -8,7 +8,9 @@
    <p>Before the script...</p>
    
    <script>
+     
      alert( 'hello, world!');
+     
    </script>
    
    <p>...After the Script.</p>
