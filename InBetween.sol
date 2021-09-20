@@ -26,19 +26,19 @@ contract InBetweenMain {
         cards[12] = Card("Three of Hearts", 3);
         cards[13] = Card("Two of Hearts", 2);
         
-        cards[14] = Card("Ace of Daimonds", 14);
-        cards[15] = Card("King of Daimonds", 13);
-        cards[16] = Card("Queen of Daimonds", 12);
-        cards[17] = Card("Jack of Daimonds", 11);
-        cards[18] = Card("Ten of Daimonds", 10);
-        cards[19] = Card("Nine of Daimonds", 9);
-        cards[20] = Card("Eight of Daimonds", 8);
-        cards[21] = Card("Seven of Daimonds", 7);
-        cards[22] = Card("Six of Daimonds", 6);
-        cards[23] = Card("Five of Daimonds", 5);
-        cards[24] = Card("Four of Daimonds", 4);
-        cards[25] = Card("Three of Daimonds", 3);
-        cards[26] = Card("Two of Daimonds", 2);
+        cards[14] = Card("Ace of Diamonds", 14);
+        cards[15] = Card("King of Diamonds", 13);
+        cards[16] = Card("Queen of Diamonds", 12);
+        cards[17] = Card("Jack of Diamonds", 11);
+        cards[18] = Card("Ten of Diamonds", 10);
+        cards[19] = Card("Nine of Diamonds", 9);
+        cards[20] = Card("Eight of Diamonds", 8);
+        cards[21] = Card("Seven of Diamonds", 7);
+        cards[22] = Card("Six of Diamonds", 6);
+        cards[23] = Card("Five of Diamonds", 5);
+        cards[24] = Card("Four of Diamonds", 4);
+        cards[25] = Card("Three of Diamonds", 3);
+        cards[26] = Card("Two of Diamonds", 2);
         
         cards[27] = Card("Ace of Spades", 14);
         cards[28] = Card("King of Spades", 13);
@@ -78,12 +78,13 @@ contract InBetweenMain {
         uint256 ante_amount;
         bool game_started;
         bool isRoundOne;
+        bool cardsDealt;
         uint256 pot;
         uint256 time_left = 30;
         string whos_turn;
         string[5] Whos_Turn_Array = ["", "It's Player_1's turn.", "It's Player_2's turn.", "It's Player_3's turn.", "It's Player_4's turn."];
         string message;
-        string[3] Message_Array = ["", "Call 'Deal' to see your first two cards.", "Call 'Bet' to see the third card or 'Pass' to pass the turn."];
+        string[3] Message_Array = ["Game has not started yet.", "Write 'Deal Cards' to see your first two cards.", "Write 'Bet' to see the third card or 'Pass' to pass the turn."];
         string card_one;
         string card_two;
         uint256 card1rank;
@@ -91,8 +92,11 @@ contract InBetweenMain {
         string card_three;
         uint256 card3rank;
         string result;
-        string[5] Result_Array = ["", "Success! You recieved funds from the pot.", "Not In-Between, your bet was added to the pot.", "Cards too close in rank, turn passed."]; //we have to ignore posts for now because there is no way to pull funds from a player, 
+        string[6] Result_Array = ["", "Bet won!", "Bet lost!", "Turn passed", "Cards too close in rank, turn passed."]; //we have to ignore posts for now because there is no way to pull funds from a player, 
                                                                                                     //kinda jank to make players bet twice as much in the event they post
+        uint256 rand1;
+        uint256 rand2;
+        uint256 rand3;
         /********************
         * Player Data Arrays
         *
@@ -111,7 +115,9 @@ contract InBetweenMain {
         ********************/
         function Set_Ante_Amt(uint256 Ante_Amount) public {
             require((game_started == false),  "You cannot change this if the game has started or if there are people in the lobby.");
+            require((playerIndexIsInGame[1] + playerIndexIsInGame[2] + playerIndexIsInGame[3] + playerIndexIsInGame[4]) == 0, "You cannot change the ante amount while players are in the lobby.");
             ante_amount = Ante_Amount;
+            pot = address(this).balance;
         }
         /********************
         * Ante Up
@@ -132,8 +138,8 @@ contract InBetweenMain {
             playerIndexToAddress[_PlayerNumber] = msg.sender;
             playerIndexIsInGame[_PlayerNumber] = 1;
             playerIndexIsAFK[_PlayerNumber] = 1;
-            pot += msg.value;
-            //players can overwrite eachother if they ante up and choose the same position. need to fix this.
+            pot = address(this).balance;
+            playerCount++;
         }
         /********************
         * Remove Players
@@ -142,11 +148,14 @@ contract InBetweenMain {
         ********************/
         function Remove_Player(uint256 _PlayerNumber) public {
             require(game_started == false, "You can only remove players from lobbies before the game starts. Try starting a timer if a player is AFK.");
+            payable(playerIndexToAddress[_PlayerNumber]).transfer(ante_amount);
             delete playerIndexToName[_PlayerNumber];
             delete playerIndexToAcePref[_PlayerNumber];
             delete playerIndexToAddress[_PlayerNumber];
             playerIndexIsInGame[_PlayerNumber] = 0;
             playerIndexIsAFK[_PlayerNumber] = 0;
+            playerCount = playerCount - 1;
+            pot = address(this).balance;
         }
         /********************
         * Toggle aces preference
@@ -203,8 +212,8 @@ contract InBetweenMain {
         * (anytime)
         ********************/
         function Game_Status() public view 
-        returns(bool Game_Started, uint256 Ante_Amount, uint256 Pot, uint256 Time_Left, string memory Whos_Turn, string memory Message, string memory Card_1, string memory Card_2, string memory Card_3, string memory Result) {
-            return (game_started, ante_amount, pot, time_left, whos_turn, message, card_one, card_two, card_three, result);
+        returns(bool Game_Started, uint256 Player_Count, uint256 Ante_Amount, uint256 Pot, uint256 Time_Left, string memory Whos_Turn, string memory Message, string memory Card_1, string memory Card_2, string memory Card_3, string memory Result) {
+            return (game_started, playerCount, ante_amount, pot, time_left, whos_turn, message, card_one, card_two, card_three, result);
         }
         /********************
         * Start the Game
@@ -217,13 +226,32 @@ contract InBetweenMain {
             require(playerCount >=2, "There must be at least two players in the lobby to start a game.");
             game_started = true;
             isRoundOne = true;
-            turnSelector = 1;
+            message = Message_Array[1];
+            pot = address(this).balance;
+            if (playerIndexIsInGame[1] == 1) {
+                turnSelector = 1;
+                whos_turn = Whos_Turn_Array[1];
+            }
+            else if (playerIndexIsInGame[2] == 1) {
+                turnSelector = 2;
+                whos_turn = Whos_Turn_Array[2];
+            }
+            else if (playerIndexIsInGame[3] == 1) {
+                turnSelector = 3;
+                whos_turn = Whos_Turn_Array[3];
+            }
+            else if (playerIndexIsInGame[4] == 1) {
+                turnSelector = 4;
+                whos_turn = Whos_Turn_Array[4];
+            }
         }
         /********************
         * Turn Selector
         *
         ********************/
         function UpdateTurn() private {
+            cardsDealt = false;
+            message = Message_Array[1];
             if (turnSelector == 1) {
                 if (playerIndexIsInGame[2] == 1) {
                     turnSelector = 2;
@@ -236,11 +264,11 @@ contract InBetweenMain {
                 else if (playerIndexIsInGame[4] == 1) {
                     turnSelector = 4;
                     whos_turn = Whos_Turn_Array[4];
-                    isRoundOne = false;
                 }
                 else {
                     turnSelector = 1;
                     whos_turn = Whos_Turn_Array[1];
+                    isRoundOne = false;
                 }
             }
             else if (turnSelector == 2) {
@@ -251,48 +279,54 @@ contract InBetweenMain {
                 else if (playerIndexIsInGame[4] == 1) {
                     turnSelector = 4;
                     whos_turn = Whos_Turn_Array[4];
-                    isRoundOne = false;
                 }
                 else if (playerIndexIsInGame[1] == 1) {
                     turnSelector = 1;
                     whos_turn = Whos_Turn_Array[1];
+                    isRoundOne = false;
                 }
                 else {
                     turnSelector = 2;
                     whos_turn = Whos_Turn_Array[2];
+                    isRoundOne = false;
                 }
             }
             else if (turnSelector == 3) {
                 if (playerIndexIsInGame[4] == 1) {
                     turnSelector = 4;
                     whos_turn = Whos_Turn_Array[4];
-                    isRoundOne = false;
                 }
                 else if (playerIndexIsInGame[1] == 1) {
                     turnSelector = 1;
                     whos_turn = Whos_Turn_Array[1];
+                    isRoundOne = false;
                 }
                 else if (playerIndexIsInGame[2] == 1) {
                     turnSelector = 2;
                     whos_turn = Whos_Turn_Array[2];
+                    isRoundOne = false;
                 }
                 else {
                     turnSelector = 3;
                     whos_turn = Whos_Turn_Array[3];
+                    isRoundOne = false;
                 }
             }
             else if (turnSelector == 4) {
                 if (playerIndexIsInGame[1] == 1) {
                     turnSelector = 1;
                     whos_turn = Whos_Turn_Array[1];
+                    isRoundOne = false;
                 }
                 else if (playerIndexIsInGame[2] == 1) {
                     turnSelector = 2;
                     whos_turn = Whos_Turn_Array[2];
+                    isRoundOne = false;
                 }
                 else if (playerIndexIsInGame[3] == 1) {
                     turnSelector = 3;
                     whos_turn = Whos_Turn_Array[3];
+                    isRoundOne = false;
                 }
                 else {
                     turnSelector = 4;
@@ -302,11 +336,40 @@ contract InBetweenMain {
             }
         }
         /********************
-        * Countdown Timer
-        *
+        * Generate (kinda) Random Number
+        * Need to fix this later
         ********************/
-        
-        
+        function randomnumbersx2() private {
+            uint256 number = uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp, msg.sender)));
+            bool continueloop1 = true;
+            bool continueloop2 = true;
+            while (continueloop1) {
+                rand1 = uint256(number % 100);
+                number = number/100;
+                    if ((rand1 >= 1) && (rand1 <=52)) {
+                        continueloop1 = false;
+                    }
+            }
+            
+            while (continueloop2 || (rand1 == rand2)) {
+                rand2 = uint256(number % 100);
+                number = number/100;
+                if ((rand2 >= 1) && (rand2 <=52)) {
+                    continueloop2 = false;
+                }
+            }
+        }
+        function randomnumbersx1() private {
+            uint256 number = uint256(keccak256(abi.encodePacked(block.difficulty, block.timestamp, msg.sender)));
+            bool continueloop1 = true;
+            while (continueloop1 || (rand3 == rand2) || (rand3 == rand2)) {
+                rand3 = uint256(number % 100);
+                number = number/100;
+                if ((rand3 >= 1) && (rand3 <=52)) {
+                    continueloop1 = false;
+                }
+            }
+        }
         /********************
         * Deal Cards
         *
@@ -315,18 +378,20 @@ contract InBetweenMain {
             
             require(game_started == true, "The game hasn't started yet.");
             require(playerIndexToAddress[turnSelector] == msg.sender, "You can only do this on your turn.");
-            //require "you have already been dealt cards this turn."
-            // get 2 rand numbers to choose cards to draw, check if they are the same
-            uint256 rand1 = 5;
-            uint256 rand2 = 42;
-            while (rand1 == rand2){ //test if this actually will prevent 2 of the same card
-                rand1 = 7;
-                rand2 = 45;
-            }
+            require(cardsDealt == false, "You have already been dealt cards.");
+            result = Result_Array[0];
+            randomnumbersx2();
             card_one = cards[rand1].cardName;
             card_two = cards[rand2].cardName;
+            card_three = "";
             card1rank = cards[rand1].rank;
             card2rank = cards[rand2].rank;
+            cardsDealt = true;
+            message = Message_Array[2];
+            if ((card1rank == card2rank) || (card1rank == card2rank +1) || (card1rank + 1 == card2rank)) {
+                UpdateTurn();
+                result = Result_Array[4];
+            }
         }
         /********************
         * Bet
@@ -335,16 +400,48 @@ contract InBetweenMain {
         function Bet() public payable {
             require(game_started == true, "The game hasn't started yet.");
             require(playerIndexToAddress[turnSelector] == msg.sender, "You can only do this on your turn.");
+            require(cardsDealt == true, "Your cards have not been dealt yet.");
+            require(msg.value <= pot, "You cannot bet more than what is in the pot.");
             if (isRoundOne) {
                 require(msg.value <= ante_amount, "You cannot bet more than the ante amount during round one.");
             }
-            //deal the third card
-            //check if player is "aces high" or "aces low"
-            //calculate if the card is "in between"
-            //if inbetween, succes message, send funds from the pot
-            //if post or miss, keep funds in pot
+            bool betWon = false;
+            bool cardoneislow;
+            if (cards[rand1].rank < cards[rand2].rank) {
+                cardoneislow = true;
+            }
+            if (cards[rand1].rank > cards[rand2].rank) {
+                cardoneislow = false;
+            }
+            randomnumbersx1();
+            card_three = cards[rand3].cardName;
+            card3rank = cards[rand3].rank;
+            if ((playerIndexToAcePref[turnSelector] == 0) && (cards[rand1].rank == 14)) { //aces low
+                if(cards[rand3].rank < cards[rand2].rank) {
+                    betWon = true;
+                }
+            } 
+            if (cardoneislow) {
+                if ((cards[rand3].rank > cards[rand1].rank) && (cards[rand3].rank < cards[rand2].rank)) {
+                    betWon = true;
+                }
+            }
+            if (!cardoneislow) {
+                if ((cards[rand3].rank < cards[rand1].rank) && (cards[rand3].rank > cards[rand2].rank)) {
+                    betWon = true;
+                }
+            }
+            if (betWon == true) {
+                payable(msg.sender).transfer(2*msg.value);
+                result = Result_Array[1];
+            }
+            if (betWon == false) {
+                result = Result_Array[2];
+            }
             UpdateTurn();
-            if (pot <= 0) {
+            cardsDealt = false;
+            pot = address(this).balance;
+            if (address(this).balance <= 0) {
                 End_Game();
             }
         }
@@ -355,7 +452,9 @@ contract InBetweenMain {
         function Pass() public {
             require(game_started == true, "The game hasn't started yet.");
             require(playerIndexToAddress[turnSelector] == msg.sender, "You can only do this on your turn.");
+            result = Result_Array[3];
             UpdateTurn();
+            cardsDealt = false;
         }
         /********************
         * End Game
@@ -364,18 +463,39 @@ contract InBetweenMain {
         function End_Game() private {
             if (pot > 0) {
                 //divide the remaining pot equally between addresses in the player array
+                if (playerIndexIsInGame[1] == 1) {
+                    payable(playerIndexToAddress[1]).transfer(pot/playerCount);
+                }
+                if (playerIndexIsInGame[2] == 1) {
+                    payable(playerIndexToAddress[2]).transfer(pot/playerCount);
+                }
+                if (playerIndexIsInGame[3] == 1) {
+                    payable(playerIndexToAddress[3]).transfer(pot/playerCount);
+                }
+                if (playerIndexIsInGame[4] == 1) {
+                    payable(playerIndexToAddress[4]).transfer(pot/playerCount);
+                }
+                payable(msg.sender).transfer(address(this).balance);
             }
             //reset the game Variables
             game_started = false;
             turnSelector = 1;
+            cardsDealt = false;
             playerCount = 0;
-            playerIndexToName = ["","","","",""]; //set player names
-            playerIndexToAcePref = [1,1,1,1,1]; //set first ace prefs, 0 = prefer low, 1 = prefer high
+            playerIndexToName = ["","","","",""]; //reset player names
+            playerIndexToAcePref = [1,1,1,1,1]; //reset first ace prefs, 0 = prefer low, 1 = prefer high
             delete playerIndexToAddress[1];
             delete playerIndexToAddress[2];
             delete playerIndexToAddress[3];
             delete playerIndexToAddress[4];
-            playerIndexIsInGame = [0,0,0,0,0]; //show whether a player is in the game, 1=ingame, 0=notingane useful for turn selector. using ints so i can add them
-            playerIndexIsAFK = [0,0,0,0,0]; //shows whether a player is afk,0=empty position 1=active, 2=afk. using ints so I can add them.
+            playerIndexIsInGame = [0,0,0,0,0]; //reset player is in the game, 1=ingame, 0=notingane useful for turn selector. using ints so i can add them
+            playerIndexIsAFK = [0,0,0,0,0]; //reset a player is afk,0=empty position 1=active, 2=afk. using ints so I can add them.
+            message = Message_Array[0];
+            whos_turn = Whos_Turn_Array[0];
+            card_one = "";
+            card_two = "";
+            card_three = "";
+            result = Result_Array[0];
+            pot = address(this).balance;
         }
-}   
+}
