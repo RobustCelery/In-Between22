@@ -1,3 +1,10 @@
+/********************************************************************************************************************************** 
+* Do not copy the contents of this box
+* use this code to interact with Kovan Testnet Address: 0xAD86630Ed185443E8da750B8B91567767d5a944f
+* (same code with "Main" deleted from contract name) use for AVAX Fuji Testnet Address: 0xea5af23cce8e4980802881a9b828d1b997104625
+**********************************************************************************************************************************/
+
+
 //SPDX-License-Identifier: MIT
 pragma solidity >=0.7.0 <0.9.0;
 
